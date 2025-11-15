@@ -1,5 +1,5 @@
 import { Button } from "./ui/button";
-import { Home, User } from "lucide-react";
+import { Home, User, Zap } from "lucide-react";
 
 interface BottomNavigationProps {
   currentPage: string;
@@ -14,6 +14,11 @@ export function BottomNavigation({ currentPage, onNavigate }: BottomNavigationPr
       icon: Home
     },
     {
+      id: 'transaksi',
+      label: 'Transaksi',
+      icon: Zap
+    },
+    {
       id: 'profile',
       label: 'Profil',
       icon: User
@@ -22,7 +27,7 @@ export function BottomNavigation({ currentPage, onNavigate }: BottomNavigationPr
 
   return (
     <div className="bg-background border-t">
-      <div className="grid grid-cols-2 h-16">
+  <div className="grid grid-cols-3 h-16">
         {navItems.map((item) => {
           const isActive = currentPage === item.id;
           return (

@@ -3,6 +3,7 @@ import { Login } from "./components/Login";
 import { ForgotPassword } from "./components/ForgotPassword";
 import { Dashboard } from "./components/Dashboard";
 import { Profile } from "./components/Profile";
+import { Transaksi } from "./components/Transaksi";
 import { BottomNavigation } from "./components/BottomNavigation";
 
 export default function App() {
@@ -43,6 +44,8 @@ export default function App() {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard onNavigate={handleNavigate} />;
+      case 'transaksi':
+        return <Transaksi onNavigate={handleNavigate} />;
       case 'profile':
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} />;
       default:
@@ -50,7 +53,7 @@ export default function App() {
     }
   };
 
-  const isMainPage = isAuthenticated && ['dashboard', 'profile'].includes(currentPage);
+  const isMainPage = isAuthenticated && ['dashboard', 'profile', 'transaksi'].includes(currentPage);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
