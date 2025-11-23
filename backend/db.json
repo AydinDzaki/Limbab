@@ -1,0 +1,168 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "name": "Admin Finance",
+      "email": "admin@example.com",
+      "password": "123",
+      "role": "Pemilik"
+    },
+    {
+      "id": "1763916622484",
+      "name": "lycoris3366",
+      "email": "lycoris3366@gmail.com",
+      "password": "123",
+      "role": "Kasir"
+    }
+  ],
+  "financialSummary": {
+    "totalBalance": 28475000,
+    "totalIncome": 45250000,
+    "totalExpense": 32180000,
+    "netProfit": 13070000,
+    "monthlyGrowth": 2.5,
+    "accountNumber": "****1234"
+  },
+  "transactions": [
+    {
+      "id": 1763917692630,
+      "type": "income",
+      "amount": 2000000,
+      "description": "Pelunasan: Lidell",
+      "category": "Pelunasan Utang",
+      "date": "24 Nov 2025",
+      "contact": "Lidell",
+      "hasReceipt": true
+    },
+    {
+      "id": 1763917690716,
+      "type": "receivable",
+      "amount": 2000000,
+      "description": "[Catatan] Utang Baru",
+      "category": "Piutang Usaha",
+      "date": "24 Nov 2025",
+      "contact": "Lidell"
+    },
+    {
+      "id": 1763917678736,
+      "type": "expense",
+      "amount": 2000000,
+      "description": "Pelunasan: Grimm",
+      "category": "Pelunasan Utang",
+      "date": "24 Nov 2025",
+      "contact": "Grimm",
+      "hasReceipt": true
+    },
+    {
+      "id": 1763917676658,
+      "type": "debt",
+      "amount": 2000000,
+      "description": "[Catatan] Utang Baru",
+      "category": "Utang Usaha",
+      "date": "24 Nov 2025",
+      "contact": "Grimm"
+    },
+    {
+      "id": 1763917612175,
+      "type": "expense",
+      "amount": 500000,
+      "description": "rf",
+      "category": "",
+      "date": "24 Nov 2025",
+      "contact": "Umum",
+      "hasReceipt": false
+    },
+    {
+      "id": 1763917602805,
+      "type": "income",
+      "amount": 500000,
+      "description": "Fr",
+      "category": "",
+      "date": "24 Nov 2025",
+      "contact": "Umum",
+      "hasReceipt": false
+    },
+    {
+      "id": 1763916538932,
+      "type": "expense",
+      "amount": 5000000,
+      "description": "test6",
+      "category": "",
+      "date": "24 Nov 2025",
+      "contact": "Umum",
+      "hasReceipt": false
+    },
+    {
+      "id": 1763916489879,
+      "type": "expense",
+      "amount": 8000000,
+      "description": "u",
+      "category": "",
+      "date": "24 Nov 2025",
+      "contact": "Umum",
+      "hasReceipt": false
+    },
+    {
+      "id": 1763916465936,
+      "type": "income",
+      "amount": 1000000,
+      "description": "test 22",
+      "category": "",
+      "date": "24 Nov 2025",
+      "contact": "Umum",
+      "hasReceipt": false
+    },
+    {
+      "id": 1,
+      "type": "income",
+      "description": "Penjualan ke PT ABC",
+      "amount": 2500000,
+      "date": "24 Nov 2025",
+      "category": "Penjualan Produk",
+      "contact": "PT ABC",
+      "hasReceipt": true
+    },
+    {
+      "id": 1,
+      "type": "income",
+      "description": "Tes Grafik",
+      "amount": 5000000,
+      "date": "24 Nov 2025",
+      "category": "Penjualan",
+      "contact": "Tes",
+      "hasReceipt": false
+    },
+    {
+      "id": 2,
+      "type": "expense",
+      "description": "Beli bahan baku",
+      "amount": 1200000,
+      "date": "23 Nov 2025",
+      "category": "Pembelian Bahan",
+      "contact": "CV XYZ",
+      "hasReceipt": true
+    }
+  ],
+  "debtEntries": [
+    {
+      "type": "piutang",
+      "customerSupplierName": "Lidell",
+      "amount": 2000000,
+      "dueDate": "2025-11-24",
+      "description": "",
+      "id": 1763917690715,
+      "status": "lunas",
+      "createdDate": "2025-11-23"
+    },
+    {
+      "type": "utang",
+      "customerSupplierName": "Grimm",
+      "amount": 2000000,
+      "dueDate": "2025-11-24",
+      "description": "",
+      "id": 1763917676657,
+      "status": "lunas",
+      "createdDate": "2025-11-23"
+    }
+  ]
+}
