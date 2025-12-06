@@ -1,777 +1,506 @@
-import { useState, useRef } from 'react';
-import { User, Lock, Users, Mail, Edit2, Trash2, UserPlus, Eye, EyeOff, Shield, LogOut, Camera } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { 
+  User, Lock, Users, Mail, Edit2, UserPlus, 
+  Eye, EyeOff, LogOut, Camera, Building2, Trash2, Check, ChevronsUpDown 
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
-import { toast } from 'sonner@2.0.3';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface TeamMember {
   id: number;
   name: string;
   email: string;
   role: 'Owner' | 'Staff' | 'Cashier';
-  joinedDate: string;
-  avatar?: string;
+  created_at: string;
 }
-
-const mockTeamMembers: TeamMember[] = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@company.com',
-    role: 'Owner',
-    joinedDate: '2024-01-15',
-  },
-  {
-    id: 2,
-    name: 'Sarah Johnson',
-    email: 'sarah.j@company.com',
-    role: 'Staff',
-    joinedDate: '2024-03-20',
-  },
-  {
-    id: 3,
-    name: 'Mike Chen',
-    email: 'mike.chen@company.com',
-    role: 'Cashier',
-    joinedDate: '2024-06-10',
-  },
-  {
-    id: 4,
-    name: 'Lisa Anderson',
-    email: 'lisa.a@company.com',
-    role: 'Staff',
-    joinedDate: '2024-08-05',
-  },
-];
 
 export function Profile() {
   const [activeSection, setActiveSection] = useState<'profile' | 'security' | 'team'>('profile');
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(mockTeamMembers);
+  
+  // State Data Real
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+  
+  // Dialog States
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showEditNameDialog, setShowEditNameDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  
+  // Form States
   const [editedName, setEditedName] = useState('');
   const { user, logout, updateProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Password states
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // Team management states
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  // Invite Form States
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'Staff' | 'Cashier'>('Staff');
-  const [editRole, setEditRole] = useState<'Staff' | 'Cashier'>('Staff');
 
-  const currentUser = {
-    name: user?.name || 'John Doe',
-    email: user?.email || 'john.doe@company.com',
-    role: user?.role || 'Owner',
-    company: user?.businessName || 'ABC Trading Company',
-    profilePhoto: user?.profilePhoto,
+  useEffect(() => {
+    if (activeSection === 'team') {
+      fetchTeamMembers();
+    }
+  }, [activeSection]);
+
+  const fetchTeamMembers = async () => {
+    try {
+      setIsLoadingTeam(true);
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setTeamMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching team:', error);
+      toast.error('Gagal memuat data tim');
+    } finally {
+      setIsLoadingTeam(false);
+    }
   };
 
-  const getUserInitials = () => {
-    return currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getUserInitials = (name?: string) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const handleLogout = () => {
-    logout();
-    toast.success('Berhasil keluar dari akun');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Berhasil keluar dari akun');
+    } catch (error) {
+      toast.error('Gagal logout');
+    }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpdateRole = async (id: number, newRole: string) => {
+    const oldMembers = [...teamMembers];
+    setTeamMembers(prev => prev.map(m => m.id === id ? { ...m, role: newRole as any } : m));
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ role: newRole })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Jabatan berhasil diperbarui');
+    } catch (error) {
+      setTeamMembers(oldMembers);
+      toast.error('Gagal mengubah jabatan');
+    }
+  };
+
+  const handleInviteMember = async () => {
+    if (!inviteName || !inviteEmail) {
+      toast.error('Nama dan Email wajib diisi');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert([
+          { name: inviteName, email: inviteEmail, role: inviteRole }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTeamMembers([...teamMembers, data]);
+      
+      toast.success(`Berhasil menambahkan ${inviteName}`);
+      setShowInviteDialog(false);
+      
+      setInviteName('');
+      setInviteEmail('');
+      setInviteRole('Staff');
+    } catch (error) {
+      console.error(error);
+      toast.error('Gagal menambahkan anggota. Pastikan tabel database sudah dibuat.');
+    }
+  };
+
+  const handleDeleteMember = async (id: number) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus anggota ini?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTeamMembers(teamMembers.filter(m => m.id !== id));
+      toast.success('Anggota tim dihapus');
+    } catch (error) {
+      toast.error('Gagal menghapus anggota');
+    }
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validasi ukuran file (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Ukuran file maksimal 5MB');
-        return;
-      }
+    if (!file || !user) return;
 
-      // Validasi tipe file
-      if (!file.type.startsWith('image/')) {
-        toast.error('File harus berupa gambar');
-        return;
-      }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 2MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar');
+      return;
+    }
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const photoUrl = reader.result as string;
-        updateProfile({ profilePhoto: photoUrl });
-        toast.success('Foto profil berhasil diperbarui');
-      };
-      reader.readAsDataURL(file);
+    try {
+      setIsUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      await updateProfile({ profilePhoto: publicUrl });
+      toast.success('Foto profil berhasil diperbarui');
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Gagal mengupload gambar');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleNameEdit = () => {
-    setEditedName(currentUser.name);
+    if (user) setEditedName(user.name);
     setShowEditNameDialog(true);
   };
 
-  const handleSaveName = () => {
+  const handleSaveName = async () => {
     if (!editedName.trim()) {
       toast.error('Nama tidak boleh kosong');
       return;
     }
-
-    updateProfile({ name: editedName });
-    toast.success('Nama berhasil diperbarui');
-    setShowEditNameDialog(false);
+    try {
+      await updateProfile({ name: editedName });
+      toast.success('Nama berhasil diperbarui');
+      setShowEditNameDialog(false);
+    } catch (error) {
+      toast.error('Gagal memperbarui nama');
+    }
   };
 
-  const handleChangePassword = () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error('Semua field password wajib diisi');
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast.error('Password baru wajib diisi');
       return;
     }
     if (newPassword !== confirmPassword) {
       toast.error('Password baru tidak cocok');
       return;
     }
-    if (newPassword.length < 8) {
-      toast.error('Password minimal 8 karakter');
+    if (newPassword.length < 6) {
+      toast.error('Password minimal 6 karakter');
       return;
     }
-    
-    toast.success('Password berhasil diubah');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-  };
-
-  const handleInviteMember = () => {
-    if (!inviteName || !inviteEmail) {
-      toast.error('Semua field wajib diisi');
-      return;
-    }
-
-    const newMember: TeamMember = {
-      id: teamMembers.length + 1,
-      name: inviteName,
-      email: inviteEmail,
-      role: inviteRole,
-      joinedDate: new Date().toISOString().split('T')[0],
-    };
-
-    setTeamMembers([...teamMembers, newMember]);
-    toast.success(`Undangan dikirim ke ${inviteName}`);
-    setShowInviteDialog(false);
-    setInviteName('');
-    setInviteEmail('');
-    setInviteRole('Staff');
-  };
-
-  const handleEditMember = () => {
-    if (!selectedMember) return;
-
-    setTeamMembers(teamMembers.map(member => 
-      member.id === selectedMember.id 
-        ? { ...member, role: editRole }
-        : member
-    ));
-    toast.success(`Role ${selectedMember.name} berhasil diubah`);
-    setShowEditDialog(false);
-    setSelectedMember(null);
-  };
-
-  const handleDeleteMember = () => {
-    if (!selectedMember) return;
-
-    setTeamMembers(teamMembers.filter(member => member.id !== selectedMember.id));
-    toast.success(`${selectedMember.name} dihapus dari tim`);
-    setShowDeleteDialog(false);
-    setSelectedMember(null);
-  };
-
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'Owner':
-        return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'Staff':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'Cashier':
-        return 'bg-green-100 text-green-700 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success('Password berhasil diubah');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal mengubah password');
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Section Navigation */}
+    <div className="flex flex-col min-h-screen pb-20">
+      {/* Sticky Header */}
       <div className="bg-white px-4 py-4 shadow-sm sticky top-0 z-10">
-        <h2 className="text-gray-900 mb-4">Profil & Pengaturan</h2>
+        <h2 className="text-gray-900 mb-4 font-semibold">Profil & Pengaturan</h2>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide [-webkit-overflow-scrolling:touch]">
           <button
             onClick={() => setActiveSection('profile')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-              activeSection === 'profile'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeSection === 'profile' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            <User className="w-4 h-4" />
-            Profil
+            <User className="w-4 h-4" /> Profil
           </button>
           <button
             onClick={() => setActiveSection('security')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-              activeSection === 'security'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeSection === 'security' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            <Lock className="w-4 h-4" />
-            Keamanan
+            <Lock className="w-4 h-4" /> Keamanan
           </button>
           <button
             onClick={() => setActiveSection('team')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-              activeSection === 'team'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeSection === 'team' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            <Users className="w-4 h-4" />
-            Tim
+            <Users className="w-4 h-4" /> Tim
           </button>
         </div>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide">
-        {/* Profile Section */}
-        {activeSection === 'profile' && (
+        
+        {activeSection === 'profile' && user && (
           <div className="space-y-4">
-            <Card className="p-6 rounded-2xl shadow-sm">
-              {/* Profile Photo Section */}
+            <Card className="p-6 rounded-2xl shadow-sm border-none bg-white">
               <div className="flex flex-col items-center mb-6">
                 <div className="relative mb-4">
-                  <Avatar className="w-24 h-24 border-4 border-blue-100">
-                    {currentUser.profilePhoto ? (
-                      <AvatarImage src={currentUser.profilePhoto} alt={currentUser.name} />
+                  <Avatar className="w-24 h-24 border-4 border-blue-50">
+                    {user.profilePhoto ? (
+                      <AvatarImage src={user.profilePhoto} alt={user.name} className="object-cover" />
                     ) : (
-                      <AvatarFallback className="bg-blue-600 text-white text-2xl">
-                        {getUserInitials()}
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-blue-600 text-white text-2xl">{getUserInitials(user.name)}</AvatarFallback>
                     )}
                   </Avatar>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition-colors shadow-lg border-2 border-white"
+                    disabled={isUploading}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 shadow-lg border-2 border-white"
                   >
                     <Camera className="w-4 h-4" />
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoChange}
-                    className="hidden"
-                  />
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                 </div>
-                <h3 className="text-gray-900">{currentUser.name}</h3>
-                <p className="text-sm text-gray-500">{currentUser.role}</p>
-                <p className="text-xs text-gray-400 mt-1">{currentUser.company}</p>
+                <h3 className="text-gray-900 font-semibold text-lg">{user.name}</h3>
+                <p className="text-sm text-gray-500">{user.role}</p>
+                <div className="flex items-center gap-1 mt-1 px-3 py-1 bg-gray-100 rounded-full">
+                  <Building2 className="w-3 h-3 text-gray-500" />
+                  <p className="text-xs text-gray-600">{user.businessName}</p>
+                </div>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <Label htmlFor="username" className="text-gray-700">
-                      Nama Lengkap
-                    </Label>
-                    <button
-                      onClick={handleNameEdit}
-                      className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm transition-colors"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      Ubah
+                    <Label className="text-gray-600 text-xs uppercase tracking-wider font-semibold">Nama Lengkap</Label>
+                    <button onClick={handleNameEdit} className="text-blue-600 flex items-center gap-1 text-xs font-medium">
+                      <Edit2 className="w-3 h-3" /> Ubah
                     </button>
                   </div>
-                  <Input
-                    id="username"
-                    value={currentUser.name}
-                    readOnly
-                    className="bg-gray-50 border-2 border-gray-200 rounded-xl cursor-not-allowed"
-                  />
+                  <div className="p-3 bg-gray-50 rounded-xl text-gray-900 border border-gray-100">{user.name}</div>
                 </div>
-
                 <div>
-                  <Label htmlFor="email" className="text-gray-700 mb-2 block">
-                    Email
-                  </Label>
+                  <Label className="text-gray-600 text-xs uppercase tracking-wider font-semibold mb-2 block">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={currentUser.email}
-                      readOnly
-                      className="pl-10 bg-gray-50 border-2 border-gray-200 rounded-xl cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="company" className="text-gray-700 mb-2 block">
-                    Nama Usaha
-                  </Label>
-                  <Input
-                    id="company"
-                    value={currentUser.company}
-                    readOnly
-                    className="bg-gray-50 border-2 border-gray-200 rounded-xl cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <div className="flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-blue-900">Informasi Terlindungi</p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      Email dan nama usaha tidak dapat diubah. Hubungi support untuk bantuan.
-                    </p>
+                    <div className="pl-10 p-3 bg-gray-50 rounded-xl text-gray-500 border border-gray-100 overflow-hidden text-ellipsis">
+                      {user.email}
+                    </div>
                   </div>
                 </div>
               </div>
             </Card>
 
-            {/* Logout Button */}
-            <Card className="p-6 rounded-2xl shadow-sm border-2 border-red-100">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-gray-900 flex items-center gap-2">
-                    <LogOut className="w-5 h-5 text-red-600" />
-                    Keluar dari Akun
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Keluar dari akun FinanceBook Anda
-                  </p>
-                </div>
+            <Card className="p-6 rounded-2xl shadow-sm border border-red-100 bg-red-50/30">
+              <div className="mb-4">
+                <h3 className="text-red-900 font-medium">Keluar Akun</h3>
+                <p className="text-sm text-red-600/80 mt-1">Sesi Anda akan berakhir.</p>
               </div>
-              <Button
-                onClick={() => setShowLogoutDialog(true)}
-                className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-xl"
-              >
-                <LogOut className="w-5 h-5 mr-2" />
-                Logout
+              <Button onClick={() => setShowLogoutDialog(true)} variant="destructive" className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 shadow-none">
+                <LogOut className="w-4 h-4 mr-2" /> Logout
               </Button>
             </Card>
           </div>
         )}
 
-        {/* Security Section */}
         {activeSection === 'security' && (
           <div className="space-y-4">
-            <Card className="p-6 rounded-2xl shadow-sm">
-              <h3 className="text-gray-900 mb-4 flex items-center gap-2">
-                <Lock className="w-5 h-5 text-blue-600" />
-                Ubah Password
+            <Card className="p-6 rounded-2xl shadow-sm border-none">
+              <h3 className="text-gray-900 mb-6 flex items-center gap-2 font-semibold">
+                <Lock className="w-5 h-5 text-blue-600" /> Ubah Password
               </h3>
-
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="current-password" className="text-gray-700 mb-2 block">
-                    Password Saat Ini
-                  </Label>
+                  <Label className="text-gray-700 mb-2 block">Password Baru</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <Input
-                      id="current-password"
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="pl-10 pr-10 border-2 border-gray-200 rounded-xl focus:border-blue-500"
-                      placeholder="Masukkan password saat ini"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="new-password" className="text-gray-700 mb-2 block">
-                    Password Baru
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <Input
-                      id="new-password"
                       type={showNewPassword ? 'text' : 'password'}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="pl-10 pr-10 border-2 border-gray-200 rounded-xl focus:border-blue-500"
-                      placeholder="Masukkan password baru"
+                      className="pl-10 pr-10 border-gray-200 rounded-xl h-11"
+                      placeholder="Minimal 6 karakter"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                       {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
-
                 <div>
-                  <Label htmlFor="confirm-password" className="text-gray-700 mb-2 block">
-                    Konfirmasi Password Baru
-                  </Label>
+                  <Label className="text-gray-700 mb-2 block">Konfirmasi Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <Input
-                      id="confirm-password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 pr-10 border-2 border-gray-200 rounded-xl focus:border-blue-500"
-                      placeholder="Konfirmasi password baru"
+                      className="pl-10 pr-10 border-gray-200 rounded-xl h-11"
+                      placeholder="Ulangi password baru"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                       {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
-
-                <Button
-                  onClick={handleChangePassword}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl mt-2"
-                >
-                  Perbarui Password
+                <Button onClick={handleChangePassword} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl mt-2">
+                  Simpan Password Baru
                 </Button>
-              </div>
-
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-sm text-amber-900">Persyaratan password:</p>
-                <ul className="text-xs text-amber-700 mt-2 space-y-1 ml-4 list-disc">
-                  <li>Minimal 8 karakter</li>
-                  <li>Kombinasi huruf besar dan kecil</li>
-                  <li>Minimal satu angka</li>
-                </ul>
               </div>
             </Card>
           </div>
         )}
 
-        {/* Team Management Section */}
         {activeSection === 'team' && (
           <div className="space-y-4">
-            {/* Header with Invite Button */}
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-gray-900">Anggota Tim</h3>
-                <p className="text-sm text-gray-500">{teamMembers.length} anggota</p>
+                <h3 className="text-gray-900 font-semibold">Anggota Tim</h3>
+                <p className="text-sm text-gray-500">Kelola akses staff & kasir</p>
               </div>
-              <Button
-                onClick={() => setShowInviteDialog(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Undang
+              <Button onClick={() => setShowInviteDialog(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                <UserPlus className="w-4 h-4 mr-2" /> Undang
               </Button>
             </div>
 
-            {/* Team Members List */}
             <div className="space-y-3">
-              {teamMembers.map((member) => (
-                <Card key={member.id} className="p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white flex-shrink-0">
-                        {member.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-gray-900 truncate">{member.name}</h4>
-                          {member.role === 'Owner' && (
-                            <Shield className="w-4 h-4 text-purple-600 flex-shrink-0" />
-                          )}
+              {isLoadingTeam ? (
+                <div className="text-center py-8 text-gray-400">Memuat data tim...</div>
+              ) : teamMembers.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed">
+                  Belum ada anggota tim
+                </div>
+              ) : (
+                teamMembers.map((member) => (
+                  <Card key={member.id} className="p-4 rounded-xl shadow-sm border-none bg-white">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                            {getUserInitials(member.name)}
+                          </div>
+                          <div>
+                            <h4 className="text-gray-900 font-medium text-sm">{member.name}</h4>
+                            <p className="text-xs text-gray-500">{member.email}</p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500 truncate flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {member.email}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className={`inline-flex px-2 py-1 rounded-lg text-xs border ${getRoleBadgeColor(member.role)}`}>
-                            {member.role}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            Bergabung {new Date(member.joinedDate).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {member.role !== 'Owner' && (
-                      <div className="flex items-center gap-2 ml-2">
-                        <button
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setEditRole(member.role as 'Staff' | 'Cashier');
-                            setShowEditDialog(true);
-                          }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setShowDeleteDialog(true);
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        <button 
+                          onClick={() => handleDeleteMember(member.id)}
+                          className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            {/* Info Box */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="text-sm text-blue-900">Manajemen Tim</p>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Kelola tingkat akses dan izin untuk anggota tim Anda
-                  </p>
-                </div>
-              </div>
+                      
+                      <div className="flex items-center gap-2 mt-2 bg-gray-50 p-2 rounded-lg">
+                        <span className="text-xs text-gray-500 font-medium ml-1">Akses:</span>
+                        <Select 
+                          value={member.role} 
+                          onValueChange={(val) => handleUpdateRole(member.id, val)}
+                        >
+                          <SelectTrigger className="h-8 border-none bg-white shadow-sm w-[120px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Staff">Staff</SelectItem>
+                            <SelectItem value="Cashier">Cashier</SelectItem>
+                            <SelectItem value="Owner">Owner</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Edit Name Dialog */}
       <Dialog open={showEditNameDialog} onOpenChange={setShowEditNameDialog}>
         <DialogContent className="max-w-[90%] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Ubah Nama</DialogTitle>
-            <DialogDescription>
-              Perbarui nama pengguna Anda
-            </DialogDescription>
-          </DialogHeader>
-          
+          <DialogHeader><DialogTitle>Ubah Nama</DialogTitle></DialogHeader>
           <div className="py-4">
-            <Label htmlFor="edit-name" className="text-gray-700 mb-2 block">
-              Nama Lengkap
-            </Label>
-            <Input
-              id="edit-name"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-              placeholder="Masukkan nama lengkap"
-              className="border-2 border-gray-200 rounded-xl"
-            />
+            <Label className="mb-2 block">Nama Lengkap</Label>
+            <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="rounded-xl" />
           </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowEditNameDialog(false)}
-              className="rounded-xl"
-            >
-              Batal
-            </Button>
-            <Button
-              onClick={handleSaveName}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-            >
-              Simpan
-            </Button>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowEditNameDialog(false)} className="flex-1 rounded-xl">Batal</Button>
+            <Button onClick={handleSaveName} className="flex-1 bg-blue-600 text-white rounded-xl">Simpan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Invite Member Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="max-w-[90%] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Undang Anggota Tim Baru</DialogTitle>
-            <DialogDescription>
-              Kirim undangan untuk menambahkan anggota baru ke tim Anda
-            </DialogDescription>
-          </DialogHeader>
-          
+          <DialogHeader><DialogTitle>Undang Anggota</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="invite-name" className="text-gray-700 mb-2 block">
-                Nama Lengkap
-              </Label>
-              <Input
-                id="invite-name"
-                value={inviteName}
-                onChange={(e) => setInviteName(e.target.value)}
-                placeholder="Masukkan nama lengkap"
-                className="border-2 border-gray-200 rounded-xl"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="invite-email" className="text-gray-700 mb-2 block">
-                Alamat Email
-              </Label>
-              <Input
-                id="invite-email"
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="email@company.com"
-                className="border-2 border-gray-200 rounded-xl"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="invite-role" className="text-gray-700 mb-2 block">
-                Role
-              </Label>
-              <Select value={inviteRole} onValueChange={(value: 'Staff' | 'Cashier') => setInviteRole(value)}>
-                <SelectTrigger className="w-full border-2 border-gray-200 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Staff">Staff</SelectItem>
-                  <SelectItem value="Cashier">Cashier</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+             <div>
+               <Label className="mb-2 block text-sm">Nama Lengkap</Label>
+               <Input placeholder="Contoh: Budi Santoso" value={inviteName} onChange={e => setInviteName(e.target.value)} className="rounded-xl" />
+             </div>
+             <div>
+               <Label className="mb-2 block text-sm">Email</Label>
+               <Input placeholder="nama@email.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="rounded-xl" />
+             </div>
+             <div>
+               <Label className="mb-2 block text-sm">Jabatan / Role</Label>
+               <Select value={inviteRole} onValueChange={(val: any) => setInviteRole(val)}>
+                  <SelectTrigger className="w-full rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Staff">Staff</SelectItem>
+                    <SelectItem value="Cashier">Cashier</SelectItem>
+                  </SelectContent>
+               </Select>
+             </div>
           </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowInviteDialog(false)}
-              className="rounded-xl"
-            >
-              Batal
-            </Button>
-            <Button
-              onClick={handleInviteMember}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-            >
-              Kirim Undangan
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={handleInviteMember} className="w-full bg-blue-600 text-white rounded-xl">Simpan Anggota</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Member Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-[90%] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Ubah Anggota Tim</DialogTitle>
-            <DialogDescription>
-              Perbarui role untuk {selectedMember?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="edit-role" className="text-gray-700 mb-2 block">
-                Role
-              </Label>
-              <Select value={editRole} onValueChange={(value: 'Staff' | 'Cashier') => setEditRole(value)}>
-                <SelectTrigger className="w-full border-2 border-gray-200 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Staff">Staff</SelectItem>
-                  <SelectItem value="Cashier">Cashier</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowEditDialog(false)}
-              className="rounded-xl"
-            >
-              Batal
-            </Button>
-            <Button
-              onClick={handleEditMember}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-            >
-              Simpan Perubahan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Member Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="max-w-[90%] rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Anggota Tim</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus {selectedMember?.name} dari tim? Tindakan ini tidak dapat dibatalkan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteMember}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-xl"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Logout Dialog */}
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent className="max-w-[90%] rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Keluar dari Akun</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin keluar dari akun? Anda perlu login kembali untuk mengakses aplikasi.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Keluar Akun?</AlertDialogTitle>
+            <AlertDialogDescription>Anda harus login kembali untuk mengakses data.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-xl"
-            >
-              Ya, Keluar
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleLogout} className="bg-red-600 text-white rounded-xl">Keluar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

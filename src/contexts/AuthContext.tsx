@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
-// Tipe data User kita (gabungan Auth Supabase + Table Profiles)
 export interface User {
   id: string;
   name: string;
@@ -36,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Cek sesi login saat aplikasi dibuka
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -47,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // 2. Dengar perubahan auth (Login/Logout/Register)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -63,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Helper: Ambil data profil tambahan dari database PostgreSQL
   const fetchProfile = async (userId: string, email: string) => {
     try {
       const { data, error } = await supabase
@@ -76,8 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('Profile not found, using metadata');
       }
 
-      // Jika data profil belum ada (baru register), pakai metadata
-      // Jika sudah ada, pakai data dari tabel
       setUser({
         id: userId,
         email: email,
@@ -101,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterData) => {
-    // Kita kirim data tambahan (metadata) agar Trigger SQL bisa menangkapnya
     const { error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
@@ -125,14 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: { name?: string; profilePhoto?: string }) => {
     if (!user) return;
 
-    // 1. Update State Lokal (biar responsif)
     setUser(prev => prev ? { 
       ...prev, 
       name: data.name || prev.name, 
       profilePhoto: data.profilePhoto || prev.profilePhoto 
     } : null);
 
-    // 2. Update Database Supabase
     const updates: any = {};
     if (data.name) updates.full_name = data.name;
     if (data.profilePhoto) updates.avatar_url = data.profilePhoto;

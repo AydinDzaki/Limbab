@@ -35,8 +35,6 @@ export function Login({ onNavigateToRegister, onNavigateToForgotPassword, onLogi
       
       if (result.success) {
         toast.success('Berhasil masuk!');
-        // Note: Kita tidak perlu kirim userName disini karena AuthContext akan mendeteksi perubahan user
-        // dan otomatis me-render halaman utama di App.tsx
       } else {
         toast.error('Email atau password salah');
         console.error(result.error);
